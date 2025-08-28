@@ -31,9 +31,23 @@ let serverStats = {
   lastRobloxRequest: null
 };
 
-// Middleware logowania
+// Zmienne do kontroli logowania
+let lastEmptyQueueLog = 0;
+const EMPTY_QUEUE_LOG_INTERVAL = 5 * 60 * 1000; // 5 minut w milisekundach
+
+// Middleware logowania z ograniczeniem dla pustych kolejek
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - IP: ${req.ip || 'unknown'}`);
+  // Dla endpointu /get-roblox-action z pustą kolejką loguj tylko co 5 minut
+  if (req.url === '/get-roblox-action' && actionQueue.length === 0) {
+    const now = Date.now();
+    if (now - lastEmptyQueueLog > EMPTY_QUEUE_LOG_INTERVAL) {
+      console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - IP: ${req.ip || 'unknown'}`);
+      lastEmptyQueueLog = now;
+    }
+  } else {
+    // Dla wszystkich innych requestów loguj normalnie
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - IP: ${req.ip || 'unknown'}`);
+  }
   next();
 });
 
@@ -171,7 +185,21 @@ app.post('/tiktok-event', (req, res) => {
 // =======================================================
 app.get('/get-roblox-action', (req, res) => {
   try {
-    console.log(`🎮 ROBLOX REQUEST - Queue length: ${actionQueue.length}`);
+    const now = Date.now();
+    let shouldLog = true;
+    
+    // Ogranicz logowanie dla pustych kolejek
+    if (actionQueue.length === 0) {
+      if (now - lastEmptyQueueLog > EMPTY_QUEUE_LOG_INTERVAL) {
+        lastEmptyQueueLog = now;
+      } else {
+        shouldLog = false;
+      }
+    }
+    
+    if (shouldLog) {
+      console.log(`🎮 ROBLOX REQUEST - Queue length: ${actionQueue.length}`);
+    }
     
     // Aktualizuj statystyki
     serverStats.lastRobloxRequest = new Date().toISOString();
@@ -209,7 +237,10 @@ app.get('/get-roblox-action', (req, res) => {
       
     } else {
       // Brak akcji w kolejce
-      console.log('📭 Brak akcji dla Roblox');
+      if (shouldLog) {
+        console.log('📭 Brak akcji dla Roblox');
+      }
+      
       res.json({
         message: 'No new actions',
         timestamp: new Date().toISOString(),
