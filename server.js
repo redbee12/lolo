@@ -61,14 +61,12 @@ app.get('/', (req, res) => {
     endpoints: {
       'POST /tiktok-event': '📱 Odbiera wydarzenia z TikFinity',
       'GET /get-roblox-action': '🎮 Pobiera akcje dla Roblox',
-      'GET /test-rose': '🌹 Test róży (10 DMG)',
-      'GET /test-coin': '🪙 Test monety (15 DMG + 500 HP)', 
-      'GET /test-planet': '🪐 Test planety (30 DMG + 1000 HP)',
+      'GET /test-action': '🧪 Test dowolnej akcji',
       'GET /status': '📊 Szczegółowy status',
       'GET /clear': '🗑️ Czyści kolejkę akcji'
     },
     author: 'OskarKoxpp',
-    version: '1.0.0'
+    version: '1.1.0'
   });
 });
 
@@ -92,13 +90,28 @@ app.post('/tiktok-event', (req, res) => {
       });
     }
     
+    // Ekstrakcja nazwy prezentu z różnych możliwych pól
+    const giftName = eventData.gift_name || eventData.giftName || eventData.gift || 
+                    eventData.type || eventData.action || eventData.event || 'unknown';
+    
+    // Ekstrakcja nazwy użytkownika z różnych możliwych pól
+    const userName = eventData.user_name || eventData.userName || eventData.username || 
+                    eventData.user || eventData.nickname || eventData.sender || 'Anonymous';
+    
+    // Ekstrakcja komentarza z różnych możliwych pól
+    const comment = eventData.comment || eventData.message || eventData.text || 
+                   eventData.description || eventData.content || '';
+    
+    // Ekstrakcja ilości
+    const amount = eventData.amount || eventData.count || eventData.quantity || 1;
+    
     // Przygotuj akcję dla Roblox
     const robloxAction = {
       // Standardowe pola z TikFinity
-      gift_name: eventData.gift_name || eventData.giftName || eventData.gift || 'unknown',
-      user_name: eventData.user_name || eventData.userName || eventData.username || eventData.user || 'Anonymous',
-      comment: eventData.comment || eventData.message || eventData.text || '',
-      amount: eventData.amount || 1,
+      gift_name: giftName,
+      user_name: userName,
+      comment: comment,
+      amount: amount,
       
       // Dodatkowe meta dane
       timestamp: new Date().toISOString(),
@@ -124,6 +137,7 @@ app.post('/tiktok-event', (req, res) => {
       gift: robloxAction.gift_name,
       user: robloxAction.user_name,
       comment: robloxAction.comment.substring(0, 30) + '...',
+      amount: robloxAction.amount,
       queue_length: actionQueue.length,
       total_received: serverStats.totalEventsReceived
     });
@@ -134,7 +148,8 @@ app.post('/tiktok-event', (req, res) => {
       action: {
         gift_name: robloxAction.gift_name,
         user_name: robloxAction.user_name,
-        comment: robloxAction.comment
+        comment: robloxAction.comment,
+        amount: robloxAction.amount
       },
       queueLength: actionQueue.length,
       totalReceived: serverStats.totalEventsReceived,
@@ -169,6 +184,7 @@ app.get('/get-roblox-action', (req, res) => {
       console.log('📤 WYSYŁAM AKCJĘ DO ROBLOX:', {
         gift: action.gift_name,
         user: action.user_name,
+        amount: action.amount,
         remaining_in_queue: actionQueue.length,
         total_sent: serverStats.totalActionsSent
       });
@@ -214,75 +230,39 @@ app.get('/get-roblox-action', (req, res) => {
 });
 
 // =======================================================
-// ENDPOINTY TESTOWE - DO DEBUGOWANIA
+// UNIWERSALNY ENDPOINT TESTOWY - DLA DOWOLNEJ AKCJI
 // =======================================================
-
-// Test róży
-app.get('/test-rose', (req, res) => {
+app.get('/test-action', (req, res) => {
+  const giftName = req.query.gift || req.query.action || req.query.type || 'test_gift';
+  const userName = req.query.user || req.query.username || 'TestUser';
+  const comment = req.query.comment || req.query.message || `Test akcji ${giftName} z serwera Render`;
+  const amount = parseInt(req.query.amount) || parseInt(req.query.count) || 1;
+  
   const testAction = {
-    gift_name: 'rose',
-    user_name: 'TestUser_Rose',
-    comment: 'Test róży z serwera Render 🌹',
-    amount: 1,
+    gift_name: giftName,
+    user_name: userName,
+    comment: comment,
+    amount: amount,
     timestamp: new Date().toISOString(),
     source: 'test',
-    processed_at: new Date().toISOString()
+    processed_at: new Date().toISOString(),
+    raw_data: {
+      gift: giftName,
+      user: userName,
+      comment: comment,
+      amount: amount,
+      test: true
+    }
   };
   
   actionQueue.push(testAction);
-  console.log('🌹 DODANO TESTOWĄ RÓŻĘ');
+  console.log(`🧪 DODANO TESTOWĄ AKCJĘ: ${giftName} (${amount}x) od ${userName}`);
   
   res.json({
-    message: '🌹 Testowa róża dodana do kolejki',
+    message: `🧪 Testowa akcja "${giftName}" dodana do kolejki`,
     action: testAction,
     queueLength: actionQueue.length,
-    info: 'W Roblox da +10 DMG'
-  });
-});
-
-// Test monety
-app.get('/test-coin', (req, res) => {
-  const testAction = {
-    gift_name: 'coin',
-    user_name: 'TestUser_Rich',
-    comment: 'Test monety z serwera Render 🪙',
-    amount: 1,
-    timestamp: new Date().toISOString(),
-    source: 'test',
-    processed_at: new Date().toISOString()
-  };
-  
-  actionQueue.push(testAction);
-  console.log('🪙 DODANO TESTOWĄ MONETĘ');
-  
-  res.json({
-    message: '🪙 Testowa moneta dodana do kolejki',
-    action: testAction,
-    queueLength: actionQueue.length,
-    info: 'W Roblox da +15 DMG + 500 HP'
-  });
-});
-
-// Test planety
-app.get('/test-planet', (req, res) => {
-  const testAction = {
-    gift_name: 'planet',
-    user_name: 'TestUser_Space',
-    comment: 'Test planety z serwera Render 🪐',
-    amount: 1,
-    timestamp: new Date().toISOString(),
-    source: 'test',
-    processed_at: new Date().toISOString()
-  };
-  
-  actionQueue.push(testAction);
-  console.log('🪐 DODANO TESTOWĄ PLANETĘ');
-  
-  res.json({
-    message: '🪐 Testowa planeta dodana do kolejki',
-    action: testAction,
-    queueLength: actionQueue.length,
-    info: 'W Roblox da +30 DMG + 1000 HP'
+    info: `W Roblox będzie obsługiwana jako: ${giftName} (${amount}x)`
   });
 });
 
@@ -310,9 +290,10 @@ app.get('/status', (req, res) => {
     },
     queue: {
       length: actionQueue.length,
-      actions: actionQueue.slice(0, 5).map(action => ({
+      actions: actionQueue.slice(0, 10).map(action => ({
         gift: action.gift_name,
         user: action.user_name,
+        amount: action.amount,
         timestamp: action.timestamp
       }))
     },
@@ -360,9 +341,7 @@ app.use((req, res) => {
       'GET /': 'Status serwera',
       'POST /tiktok-event': 'Odbiera z TikFinity',
       'GET /get-roblox-action': 'Dla Roblox',
-      'GET /test-rose': 'Test róży',
-      'GET /test-coin': 'Test monety',
-      'GET /test-planet': 'Test planety',
+      'GET /test-action': 'Test dowolnej akcji',
       'GET /status': 'Szczegółowy status',
       'GET /clear': 'Wyczyść kolejkę',
       'GET /health': 'Health check'
@@ -395,20 +374,21 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('📡 Port:', PORT);
   console.log('⏰ Start time:', new Date().toISOString());
   console.log('👤 Author: OskarKoxpp');
+  console.log('🔢 Version: 1.1.0');
   console.log('===============================================');
   console.log('📋 DOSTĘPNE ENDPOINTY:');
   console.log('  GET  / - Status serwera');
   console.log('  POST /tiktok-event - Odbiera z TikFinity');
   console.log('  GET  /get-roblox-action - Dla Roblox');
-  console.log('  GET  /test-rose - Test róży');
-  console.log('  GET  /test-coin - Test monety');
-  console.log('  GET  /test-planet - Test planety');
+  console.log('  GET  /test-action - Test dowolnej akcji');
   console.log('  GET  /status - Szczegółowy status');
   console.log('  GET  /clear - Wyczyść kolejkę');
   console.log('  GET  /health - Health check');
   console.log('===============================================');
   console.log('🔗 Webhook URL dla TikFinity:');
   console.log('   https://TWOJA-DOMENA.onrender.com/tiktok-event');
+  console.log('🧪 Test dowolnej akcji:');
+  console.log('   /test-action?gift=NAZWA&user=USER&comment=TEKST&amount=1');
   console.log('===============================================');
 });
 
